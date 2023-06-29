@@ -18,9 +18,9 @@ AsyncWebServer server(80);
 // A4988 GPIOs
 #define MS1   15
 #define MS2   2
-#define MS3   12
+#define MS3   0
 #define DIR   13
-#define STEP  0
+#define STEP  12
 
 #define TOG_SWITCH  14
 
@@ -36,6 +36,8 @@ AccelStepper stepper = AccelStepper(MOTOR_DRIVER, STEP, DIR);
 
 int setupOTA();
 void recvMsg(uint8_t *data, size_t len);
+
+int lastSwitch = LOW;
 
 
 void setup() {
@@ -68,25 +70,44 @@ void setup() {
 
 void loop() {
   //If it powers on or is switched to HIGH then the motor needs to move to a certain position. For now force it to go all the way up and then check for if things are low
-  if(digitalRead(TOG_SWITCH) && stepper.currentPosition() < LIFT_HEIGHT ) {
-    if( stepper.currentPosition() < (LIFT_HEIGHT / 2) ) { //Faster near bottom
+  // if(digitalRead(TOG_SWITCH) && stepper.currentPosition() < LIFT_HEIGHT ) {
+  //   if( stepper.currentPosition() < (LIFT_HEIGHT / 2) ) { //Faster near bottom
+  //     stepper.setSpeed(UP_SPEED_MED);
+  //     stepper.runSpeed();
+  //   } else { //Slower up top
+  //     stepper.setSpeed(UP_SPEED_SLOW);
+  //     stepper.runSpeed();
+  //   }
+  // }
+
+  // if( !digitalRead(TOG_SWITCH) && stepper.currentPosition() > 0) { //Lower back down slowly
+  //   if( stepper.currentPosition() > (LIFT_HEIGHT / 2) ) { //Faster near top
+  //     stepper.setSpeed(DOWN_SPEED_MED);
+  //     stepper.runSpeed();
+  //   } else { //Slower near bottom
+  //     stepper.setSpeed(DOWN_SPEED_SLOW);
+  //     stepper.runSpeed();
+  //   }
+  // }
+  if( digitalRead(TOG_SWITCH) && lastSwitch == LOW) {
+    Serial.println("Switched HIGH!");
+    while(stepper.currentPosition() < LIFT_HEIGHT ) {
       stepper.setSpeed(UP_SPEED_MED);
-      stepper.runSpeed();
-    } else { //Slower up top
-      stepper.setSpeed(UP_SPEED_SLOW);
       stepper.runSpeed();
     }
   }
 
-  if( !digitalRead(TOG_SWITCH) && stepper.currentPosition() > 0) { //Lower back down slowly
-    if( stepper.currentPosition() > (LIFT_HEIGHT / 2) ) { //Faster near top
-      stepper.setSpeed(DOWN_SPEED_MED);
-      stepper.runSpeed();
-    } else { //Slower near bottom
-      stepper.setSpeed(DOWN_SPEED_SLOW);
+  if( !digitalRead(TOG_SWITCH) && lastSwitch == HIGH) {
+    Serial.println("Switched LOW!");
+    while(stepper.currentPosition() > 0 ) {
+      stepper.setSpeed(-1*UP_SPEED_MED);
       stepper.runSpeed();
     }
   }
+
+
+  // lastSwitch = digitalRead(TOG_SWITCH);
+  // Serial.println(lastSwitch);
 
   ArduinoOTA.handle();
   yield();  
