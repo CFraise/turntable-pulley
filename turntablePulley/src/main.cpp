@@ -26,11 +26,11 @@ AsyncWebServer server(80);
 
 #define MOTOR_DRIVER 1
 
-#define LIFT_HEIGHT       400
+#define LIFT_HEIGHT       1600
 #define UP_SPEED_SLOW     100
-#define UP_SPEED_MED      200
-#define DOWN_SPEED_SLOW   -50
-#define DOWN_SPEED_MED    -100
+#define UP_SPEED_MED      500
+#define DOWN_SPEED_SLOW   -10
+#define DOWN_SPEED_MED    -30
 
 AccelStepper stepper = AccelStepper(MOTOR_DRIVER, STEP, DIR);
 
@@ -47,11 +47,23 @@ void setup() {
   Serial.println("Connecting...");
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  if( setupOTA() ) {
-    WebSerial.begin(&server);
-    WebSerial.msgCallback(recvMsg);
-    server.begin();
+  // if( setupOTA() ) {
+  //   WebSerial.begin(&server);
+  //   WebSerial.msgCallback(recvMsg);
+  //   server.begin();
+  // }
+
+  if (WiFi.waitForConnectResult() != WL_CONNECTED) {
+    Serial.printf("WiFi Failed!\n");
+    return;
   }
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
+
+  WebSerial.begin(&server);
+  WebSerial.msgCallback(recvMsg);
+  server.begin();
+
 
 
   pinMode(TOG_SWITCH, INPUT);
@@ -59,9 +71,9 @@ void setup() {
   pinMode(MS2, OUTPUT);
   pinMode(MS3, OUTPUT);
 
-  // Start in fullstep mode by default
-  digitalWrite(MS1, LOW);
-  digitalWrite(MS2, LOW);
+  // Start in eighth mode by default
+  digitalWrite(MS1, HIGH);
+  digitalWrite(MS2, HIGH);
   digitalWrite(MS3, LOW);
 
   stepper.setCurrentPosition(0);
@@ -90,26 +102,35 @@ void loop() {
   //   }
   // }
   if( digitalRead(TOG_SWITCH) && lastSwitch == LOW) {
+    digitalWrite(MS1, HIGH);
+    digitalWrite(MS2, LOW);
+    digitalWrite(MS3, LOW);
     Serial.println("Switched HIGH!");
-    while(stepper.currentPosition() < LIFT_HEIGHT ) {
+    while(stepper.currentPosition() < 2*LIFT_HEIGHT ) {
       stepper.setSpeed(UP_SPEED_MED);
       stepper.runSpeed();
+      Serial.println(stepper.currentPosition());
     }
   }
 
   if( !digitalRead(TOG_SWITCH) && lastSwitch == HIGH) {
+    digitalWrite(MS1, HIGH);
+    digitalWrite(MS2, HIGH);
+    digitalWrite(MS3, LOW);
     Serial.println("Switched LOW!");
     while(stepper.currentPosition() > 0 ) {
       stepper.setSpeed(-1*UP_SPEED_MED);
       stepper.runSpeed();
+      Serial.println(stepper.currentPosition());
     }
   }
+  //Serial.println(stepper.currentPosition());
 
 
-  // lastSwitch = digitalRead(TOG_SWITCH);
+  lastSwitch = digitalRead(TOG_SWITCH);
   // Serial.println(lastSwitch);
 
-  ArduinoOTA.handle();
+  //ArduinoOTA.handle();
   yield();  
 }
 
