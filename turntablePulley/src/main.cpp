@@ -27,11 +27,11 @@ AsyncWebServer server(80);
 
 #define MOTOR_DRIVER 1
 
-#define LIFT_HEIGHT       1600
-#define UP_SPEED_SLOW     100
+#define LIFT_HEIGHT       1000
+#define UP_SPEED_SLOW     400
 #define UP_SPEED_MED      500
-#define DOWN_SPEED_SLOW   -10
-#define DOWN_SPEED_MED    -30
+#define DOWN_SPEED_SLOW   -500
+#define DOWN_SPEED_MED    -600
 
 #define FULL_STEP       1
 #define HALF_STEP       2
@@ -52,8 +52,8 @@ int lastSwitchRead = LOW;
 bool moving = LOW;
 
 //Params to tune
-int upMode = HALF_STEP;
-int upSpeed = UP_SPEED_MED;
+int upMode = QUARTER_STEP;
+int upSpeed = 1000;
 
 
 void setup() {
@@ -96,7 +96,8 @@ void setup() {
   digitalWrite(SLEEP, LOW); //Unpowered until switch goes high
 
   stepper.setCurrentPosition(0);
-  stepper.setMaxSpeed(1000);
+  stepper.setMaxSpeed(800);
+  stepper.setAcceleration(10);
 }
 
 void loop() {
@@ -109,31 +110,42 @@ void loop() {
     changeMicrostep(upMode);    
     moving = HIGH;
     Serial.println("Switched HIGH!");
-  }
-  if( currentSwitchRead && stepper.currentPosition() < microstepMult*LIFT_HEIGHT ) {
-    if( stepper.currentPosition() < ((microstepMult*LIFT_HEIGHT) / 2) ) { //Faster near bottom
-      stepper.setSpeed(UP_SPEED_MED);
-      stepper.runSpeed();
-    } else { //Slower up top
-      stepper.setSpeed(UP_SPEED_SLOW);
-      stepper.runSpeed();
-    }
-    Serial.println(stepper.currentPosition());
+    stepper.setMaxSpeed(upSpeed);
+    stepper.setAcceleration(400);
+    stepper.moveTo(microstepMult*LIFT_HEIGHT);
   }
 
+  // if( currentSwitchRead && stepper.currentPosition() < microstepMult*LIFT_HEIGHT ) {
+  //   // if( stepper.currentPosition() < ((microstepMult*LIFT_HEIGHT) / 2) ) { //Faster near bottom
+  //     stepper.setSpeed(UP_SPEED_MED);
+  //     stepper.runSpeed();
+  //   // } else { //Slower up top
+  //   //   stepper.setSpeed(UP_SPEED_SLOW);
+  //   //   stepper.runSpeed();
+  //   // }
+  //   Serial.println(stepper.currentPosition());
+  // }
+
   if( !currentSwitchRead && lastSwitchRead ) {
-    changeMicrostep(EIGHTH_STEP); 
+  changeMicrostep(QUARTER_STEP); 
     Serial.println("Switched LOW!");
+    stepper.setMaxSpeed(750);
+    stepper.setAcceleration(140);
+    stepper.moveTo(0);
   }
-  if( !currentSwitchRead && stepper.currentPosition() > 0) { //Lower back down slowly
-    if( stepper.currentPosition() > ((microstepMult*LIFT_HEIGHT) / 2) ) { //Faster near top
-      stepper.setSpeed(DOWN_SPEED_MED);
-      stepper.runSpeed();
-    } else { //Slower near bottom
-      stepper.setSpeed(DOWN_SPEED_SLOW);
-      stepper.runSpeed();
-    }
-  }
+
+  if(moving)
+    stepper.run();
+  // if( !currentSwitchRead && stepper.currentPosition() > 0) { //Lower back down slowly
+  //   // if( stepper.currentPosition() > ((microstepMult*LIFT_HEIGHT) / 2) ) { //Faster near top
+  //     stepper.setSpeed(DOWN_SPEED_MED);
+  //     stepper.runSpeed();
+  //   // } else { //Slower near bottom
+  //   //   stepper.setSpeed(DOWN_SPEED_SLOW);
+  //   //   stepper.runSpeed();
+  //   // }
+  //   Serial.println(stepper.currentPosition());
+  // }
 
   if(moving && !currentSwitchRead && stepper.currentPosition() == 0) {
     moving = LOW;
@@ -174,29 +186,55 @@ void recvMsg(uint8_t *data, size_t len){
     upMode = SIXTEENTH_STEP;
     WebSerial.println("Changed upward microstep mode to Sixteenth Step");
   } else if (d=="U") {
-    upSpeed += 30;
+    upSpeed += 100;
     WebSerial.print("Up speed is now to to: ");
-    WebSerial.println(d);
+    WebSerial.println(upSpeed);
   }else if (d=="I") {
-    upSpeed += 8;
+    upSpeed += 50;
     WebSerial.print("Up speed is now to to: ");
-    WebSerial.println(d);
+    WebSerial.println(upSpeed);
   }else if (d=="O") {
     upSpeed += 1;
     WebSerial.print("Up speed is now to to: ");
-    WebSerial.println(d);
+    WebSerial.println(upSpeed);
   }else if (d=="B") {
-    upSpeed -= 30;
+    upSpeed -= 100;
     WebSerial.print("Up speed is now to to: ");
-    WebSerial.println(d);
+    WebSerial.println(upSpeed);
   }else if (d=="N") {
-    upSpeed -= 8;
+    upSpeed -= 50;
     WebSerial.print("Up speed is now to to: ");
-    WebSerial.println(d);
-  }else if (d=="M") {
-    upSpeed -= 1;
-    WebSerial.print("Up speed is now to to: ");
-    WebSerial.println(d);
+    WebSerial.println(upSpeed);
+  }else if (d=="0") {
+    stepper.setAcceleration(100);
+    WebSerial.println("Acceleration is now 100");
+  }else if (d=="1") {
+    stepper.setAcceleration(150);
+    WebSerial.println("Acceleration is now 150");
+  }else if (d=="2") {
+    stepper.setAcceleration(200);
+    WebSerial.println("Acceleration is now 200");
+  }else if (d=="3") {
+    stepper.setAcceleration(250);
+    WebSerial.println("Acceleration is now 250");
+  }else if (d=="4") {
+    stepper.setAcceleration(300);
+    WebSerial.println("Acceleration is now 300");
+  }else if (d=="5") {
+    stepper.setAcceleration(350);
+    WebSerial.println("Acceleration is now 350");
+  }else if (d=="6") {
+    stepper.setAcceleration(400);
+    WebSerial.println("Acceleration is now 400");
+  }else if (d=="7") {
+    stepper.setAcceleration(450);
+    WebSerial.println("Acceleration is now 450");
+  }else if (d=="8") {
+    stepper.setAcceleration(500);
+    WebSerial.println("Acceleration is now 500");
+  }else if (d=="9") {
+    stepper.setAcceleration(220);
+    WebSerial.println("Acceleration is now 220");
   }
 
 }
