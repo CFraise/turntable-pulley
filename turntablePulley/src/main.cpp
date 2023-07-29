@@ -93,7 +93,7 @@ void setup() {
   digitalWrite(MS2, HIGH);
   digitalWrite(MS3, LOW);
 
-  digitalWrite(SLEEP, LOW); //Unpowered until switch goes high
+  digitalWrite(SLEEP, HIGH); //Unpowered until switch goes high
 
   stepper.setCurrentPosition(0);
   stepper.setMaxSpeed(800);
@@ -106,7 +106,7 @@ void loop() {
   currentSwitchRead = digitalRead(TOG_SWITCH);
 
   if( currentSwitchRead && !lastSwitchRead) {
-    digitalWrite(SLEEP, HIGH); //enable motor driver
+    digitalWrite(SLEEP, LOW); //enable motor driver
     changeMicrostep(upMode);    
     moving = HIGH;
     Serial.println("Switched HIGH!");
@@ -149,7 +149,7 @@ void loop() {
 
   if(moving && !currentSwitchRead && stepper.currentPosition() == 0) {
     moving = LOW;
-    digitalWrite(SLEEP, LOW); //disable motor driver
+    digitalWrite(SLEEP, HIGH); //disable motor driver
   }
 
 
