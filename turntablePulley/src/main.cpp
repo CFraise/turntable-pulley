@@ -33,7 +33,7 @@ AsyncWebServer server(80);
 #define EIGHTH_STEP     4
 #define SIXTEENTH_STEP  5
 
-#define STEPPER_NEMA17  1 //COMMENT OUT IF USING SEEED STEPPER
+//#define STEPPER_NEMA17  1 //COMMENT OUT IF USING SEEED STEPPER
 
 #ifdef STEPPER_NEMA17
 
@@ -47,13 +47,13 @@ AsyncWebServer server(80);
 
 #else //SEEED params
 
-  #define LIFT_HEIGHT       2500*2045/200
-  #define UP_ACCEL          800
-  #define UP_SPEED          5000
-  #define UP_STEP_MODE      EIGHTH_STEP
+  #define LIFT_HEIGHT       2500*1000/200
+  #define UP_ACCEL          500
+  #define UP_SPEED          2000
+  #define UP_STEP_MODE      QUARTER_STEP
   #define DOWN_ACCEL        500
-  #define DOWN_SPEED        3000
-  #define DOWN_STEP_MODE    SIXTEENTH_STEP
+  #define DOWN_SPEED        2000
+  #define DOWN_STEP_MODE    QUARTER_STEP
 
 #endif
 
