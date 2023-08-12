@@ -18,7 +18,7 @@ AsyncWebServer server(80);
 // A4988 GPIOs
 #define MS1   15
 #define MS2   2
-#define MS3   0
+//#define MS3   0
 #define DIR   13
 #define STEP  12
 #define SLEEP 4
@@ -27,17 +27,37 @@ AsyncWebServer server(80);
 
 #define MOTOR_DRIVER 1
 
-#define LIFT_HEIGHT       1000
-#define UP_SPEED_SLOW     400
-#define UP_SPEED_MED      500
-#define DOWN_SPEED_SLOW   -500
-#define DOWN_SPEED_MED    -600
-
-#define FULL_STEP       1
+//#define FULL_STEP       1
 #define HALF_STEP       2
 #define QUARTER_STEP    3
 #define EIGHTH_STEP     4
 #define SIXTEENTH_STEP  5
+
+#define STEPPER_NEMA17  1 //COMMENT OUT IF USING SEEED STEPPER
+
+#ifdef STEPPER_NEMA17
+
+  #define LIFT_HEIGHT       2500
+  #define UP_ACCEL          600
+  #define UP_SPEED          3500
+  #define UP_STEP_MODE      EIGHTH_STEP
+  #define DOWN_ACCEL        350
+  #define DOWN_SPEED        2500
+  #define DOWN_STEP_MODE    SIXTEENTH_STEP
+
+#else //SEEED params
+
+  #define LIFT_HEIGHT       2500*2045/200
+  #define UP_ACCEL          800
+  #define UP_SPEED          5000
+  #define UP_STEP_MODE      EIGHTH_STEP
+  #define DOWN_ACCEL        500
+  #define DOWN_SPEED        3000
+  #define DOWN_STEP_MODE    SIXTEENTH_STEP
+
+#endif
+
+
 
 int microstepMult = 1;
 
@@ -46,14 +66,16 @@ AccelStepper stepper = AccelStepper(MOTOR_DRIVER, STEP, DIR);
 int setupOTA();
 void recvMsg(uint8_t *data, size_t len);
 void changeMicrostep(int microstepIndex);
+void lightSleep();
 
 int currentSwitchRead = LOW;
 int lastSwitchRead = LOW;
 bool moving = LOW;
+long int millisWhenFinished = 0;
 
 //Params to tune
 int upMode = QUARTER_STEP;
-int upSpeed = 1000;
+int upSpeed = 1500;
 
 
 void setup() {
@@ -63,11 +85,11 @@ void setup() {
   Serial.println("Connecting...");
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  // if( setupOTA() ) {
-  //   WebSerial.begin(&server);
-  //   WebSerial.msgCallback(recvMsg);
-  //   server.begin();
-  // }
+  if( setupOTA() ) {
+    WebSerial.begin(&server);
+    WebSerial.msgCallback(recvMsg);
+    server.begin();
+  }
 
   if (WiFi.waitForConnectResult() != WL_CONNECTED) {
     Serial.printf("WiFi Failed!\n");
@@ -76,28 +98,31 @@ void setup() {
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
 
-  WebSerial.begin(&server);
-  WebSerial.msgCallback(recvMsg);
-  server.begin();
+  // WebSerial.begin(&server);
+  // WebSerial.msgCallback(recvMsg);
+  // server.begin();
+
+  Serial.print("Lift Height is ");
+  Serial.print(LIFT_HEIGHT);
 
 
 
   pinMode(TOG_SWITCH, INPUT);
   pinMode(MS1, OUTPUT);
   pinMode(MS2, OUTPUT);
-  pinMode(MS3, OUTPUT);
+  //pinMode(MS3, OUTPUT);
   pinMode(SLEEP, OUTPUT);
 
   // Start in eighth mode by default
   digitalWrite(MS1, HIGH);
   digitalWrite(MS2, HIGH);
-  digitalWrite(MS3, LOW);
+  //digitalWrite(MS3, LOW);
 
   digitalWrite(SLEEP, HIGH); //Unpowered until switch goes high
 
   stepper.setCurrentPosition(0);
   stepper.setMaxSpeed(800);
-  stepper.setAcceleration(10);
+  stepper.setAcceleration(400);
 }
 
 void loop() {
@@ -107,11 +132,11 @@ void loop() {
 
   if( currentSwitchRead && !lastSwitchRead) {
     digitalWrite(SLEEP, LOW); //enable motor driver
-    changeMicrostep(upMode);    
+    changeMicrostep(UP_STEP_MODE);    
     moving = HIGH;
     Serial.println("Switched HIGH!");
-    stepper.setMaxSpeed(upSpeed);
-    stepper.setAcceleration(400);
+    stepper.setMaxSpeed(UP_SPEED);
+    stepper.setAcceleration(UP_ACCEL);
     stepper.moveTo(microstepMult*LIFT_HEIGHT);
   }
 
@@ -126,11 +151,11 @@ void loop() {
   //   Serial.println(stepper.currentPosition());
   // }
 
-  if( !currentSwitchRead && lastSwitchRead ) {
-  changeMicrostep(QUARTER_STEP); 
+  if( !currentSwitchRead && lastSwitchRead ) { //&& stepper.currentPosition() == (microstepMult*LIFT_HEIGHT) ) {
+    changeMicrostep(DOWN_STEP_MODE); 
     Serial.println("Switched LOW!");
-    stepper.setMaxSpeed(750);
-    stepper.setAcceleration(140);
+    stepper.setMaxSpeed(DOWN_SPEED);
+    stepper.setAcceleration(DOWN_ACCEL);
     stepper.moveTo(0);
   }
 
@@ -150,12 +175,22 @@ void loop() {
   if(moving && !currentSwitchRead && stepper.currentPosition() == 0) {
     moving = LOW;
     digitalWrite(SLEEP, HIGH); //disable motor driver
+    millisWhenFinished = millis();
+  }
+
+  if(millisWhenFinished != 0 && !moving && millis() > (millisWhenFinished + 5000)) { //5s after stopping NOTE should eventually change so this happens after startup as well. if it gets powered on and isnt used could end up being wasteful
+    Serial.println("Entering SLEEP mode!!");
+    delay(1000);
+    lightSleep();
+    delay(100);
+    Serial.println("Wakey wakey??");
+    //ESP.wdtEnable(5000);
   }
 
 
   lastSwitchRead = currentSwitchRead;
-
-  //ArduinoOTA.handle();
+  //Serial.println("Awake");
+  ArduinoOTA.handle();
   yield();  
 }
 
@@ -167,8 +202,8 @@ void recvMsg(uint8_t *data, size_t len){
   }
   WebSerial.println(d);
   if (d == "F"){ 
-    upMode = FULL_STEP;
-    WebSerial.println("Changed upward microstep mode to Full Step");
+    //upMode = FULL_STEP;
+    WebSerial.println("Can't change to full step on TMC2208");
   }
   else if (d=="H"){
     upMode = HALF_STEP;
@@ -224,14 +259,14 @@ void recvMsg(uint8_t *data, size_t len){
     stepper.setAcceleration(350);
     WebSerial.println("Acceleration is now 350");
   }else if (d=="6") {
-    stepper.setAcceleration(400);
-    WebSerial.println("Acceleration is now 400");
+    stepper.setAcceleration(600);
+    WebSerial.println("Acceleration is now 600");
   }else if (d=="7") {
-    stepper.setAcceleration(450);
-    WebSerial.println("Acceleration is now 450");
+    stepper.setAcceleration(800);
+    WebSerial.println("Acceleration is now 800");
   }else if (d=="8") {
-    stepper.setAcceleration(500);
-    WebSerial.println("Acceleration is now 500");
+    stepper.setAcceleration(1000);
+    WebSerial.println("Acceleration is now 1000");
   }else if (d=="9") {
     stepper.setAcceleration(220);
     WebSerial.println("Acceleration is now 220");
@@ -292,18 +327,18 @@ int setupOTA()
 // input: microstepIndex -> chooses which microstep mode to enter
 void changeMicrostep(int microstepIndex) {
   switch(microstepIndex) {
-    case FULL_STEP:
-      digitalWrite(MS1, LOW);
-      digitalWrite(MS2, LOW);
-      digitalWrite(MS3, LOW);
-      stepper.setCurrentPosition(  stepper.currentPosition() * 1 / microstepMult );
-      microstepMult = 1;
-      Serial.println("Switched to Full Step mode");
-      break;
+    // case FULL_STEP:
+    //   digitalWrite(MS1, LOW);
+    //   digitalWrite(MS2, LOW);
+    //   digitalWrite(MS3, LOW);
+    //   stepper.setCurrentPosition(  stepper.currentPosition() * 1 / microstepMult );
+    //   microstepMult = 1;
+    //   Serial.println("Switched to Full Step mode");
+    //   break;
     case HALF_STEP:
       digitalWrite(MS1, HIGH);
       digitalWrite(MS2, LOW);
-      digitalWrite(MS3, LOW);
+      //digitalWrite(MS3, LOW);
       stepper.setCurrentPosition(  stepper.currentPosition() * 2 / microstepMult );
       microstepMult = 2;
       Serial.println("Switched to Half Step mode");
@@ -311,15 +346,15 @@ void changeMicrostep(int microstepIndex) {
     case QUARTER_STEP:
       digitalWrite(MS1, LOW);
       digitalWrite(MS2, HIGH);
-      digitalWrite(MS3, LOW);
+      //digitalWrite(MS3, LOW);
       stepper.setCurrentPosition(  stepper.currentPosition() * 4 / microstepMult );
       microstepMult = 4;
       Serial.println("Switched to Quarter Step mode");
       break;
     case EIGHTH_STEP:
-      digitalWrite(MS1, HIGH);
-      digitalWrite(MS2, HIGH);
-      digitalWrite(MS3, LOW);
+      digitalWrite(MS1, LOW);
+      digitalWrite(MS2, LOW);
+      //digitalWrite(MS3, LOW);
       stepper.setCurrentPosition(  stepper.currentPosition() * 8 / microstepMult );
       microstepMult = 8;
       Serial.println("Switched to Eighth Step mode");
@@ -327,10 +362,21 @@ void changeMicrostep(int microstepIndex) {
     case SIXTEENTH_STEP:
       digitalWrite(MS1, HIGH);
       digitalWrite(MS2, HIGH);
-      digitalWrite(MS3, HIGH);
+      //digitalWrite(MS3, HIGH);
       stepper.setCurrentPosition(  stepper.currentPosition() * 16 / microstepMult );
       microstepMult = 16;
       Serial.println("Switched to Sixteenth Step mode");
       break;
   }
+}
+
+void lightSleep() {
+  //ESP.wdtDisable();
+  wifi_set_opmode(NULL_MODE); 
+  wifi_fpm_set_sleep_type(LIGHT_SLEEP_T);
+  wifi_fpm_open();
+  delay(100);
+  gpio_pin_wakeup_enable(GPIO_ID_PIN(TOG_SWITCH), GPIO_PIN_INTR_HILEVEL);
+  wifi_fpm_do_sleep(0xFFFFFFF);
+  delay(100);
 }
